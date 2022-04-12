@@ -30,6 +30,8 @@ contract BridgeToken is ERC20, ERC20Burnable, Ownable {
         validator = validator_;
     }
 
+    /// @dev Set address of bridge validator
+    /// @param validator_ address of new validator
     function setValidator(address validator_) external onlyOwner {
         validator = validator_;
     }
@@ -39,6 +41,8 @@ contract BridgeToken is ERC20, ERC20Burnable, Ownable {
     }
 
     /// @dev request swap tokens to other evm network
+    /// @param destinationAddress recepient address
+    /// @param value amount of tokens to be bridged
     function swap(address destinationAddress, uint256 value) external {
         _burn(msg.sender, value);
         if (destinationAddress == address(0)) {
@@ -48,15 +52,18 @@ contract BridgeToken is ERC20, ERC20Burnable, Ownable {
         swapId.increment();
     }
 
-    /// @dev redeem tokens that was swapped on other side
+    /// @dev redeem tokens that was swapped on other side. Message will be constructed from function arguments
+    /// @param destinationAddress recepient address
+    /// @param value amount of tokens to redeem
+    /// @param swapId_ id of swap
+    /// @param signature signature of bridge validator
     function redeem(
         address destinationAddress,
         uint256 value,
         uint256 swapId_,
         bytes memory signature
     ) external {
-        bytes32 messageHash = keccak256(abi.encodePacked(destinationAddress, value, swapId_))
-            .toEthSignedMessageHash();
+        bytes32 messageHash = keccak256(abi.encodePacked(destinationAddress, value, swapId_)).toEthSignedMessageHash();
         require(!redeemedSwaps[swapId_], "Already redeemed");
         require(isValidSignature(messageHash, signature), "Signature not valid");
         redeemedSwaps[swapId_] = true;

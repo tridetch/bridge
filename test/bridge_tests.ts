@@ -1,5 +1,7 @@
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
-import { expect } from "chai";
+import { assert, expect, use } from "chai";
+import { utils } from "ethers";
+import { arrayify, parseUnits } from "ethers/lib/utils";
 import { ethers, network } from "hardhat";
 import { BridgeToken } from "../typechain";
 
@@ -9,22 +11,29 @@ describe("Bridge", function () {
     let bridgeSideA: BridgeToken;
     let bridgeSideB: BridgeToken;
 
-    let user: SignerWithAddress, validatorSideA: SignerWithAddress, validatorSideB: SignerWithAddress;
+    let user: SignerWithAddress,
+        user2: SignerWithAddress,
+        validatorSideA: SignerWithAddress,
+        validatorSideB: SignerWithAddress,
+        imposter: SignerWithAddress;
 
-    const TEST_TOKEN_URI = "https://gateway.pinata.cloud/ipfs/QmcrrUjqWbUAKhqC84W2Bb6aGpbB7K4WWuYTwzgKZbgzSD";
-    const TOKEN_ID = 0;
+    const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
+    const MINT_AMOUNT = parseUnits("1000");
 
     before(async () => {
-        [user, validatorSideA, validatorSideB] = await ethers.getSigners();
+        [user, user2, validatorSideA, validatorSideB, imposter] = await ethers.getSigners();
 
         const BridgeFactory = await ethers.getContractFactory("BridgeToken");
-        
+
         bridgeSideA = await BridgeFactory.deploy("BridgeTokenSideA", "aBST", validatorSideA.address);
         await bridgeSideA.deployed();
 
         bridgeSideB = await BridgeFactory.deploy("BridgeTokenSideB", "bBST", validatorSideB.address);
         await bridgeSideB.deployed();
-        
+
+        // Mint initial funds for user
+        await bridgeSideA.mint(user.address, MINT_AMOUNT);
+
         clean = await network.provider.send("evm_snapshot");
     });
 
@@ -33,18 +42,97 @@ describe("Bridge", function () {
         clean = await network.provider.send("evm_snapshot");
     });
 
-    it("Should return the new greeting once it's changed", async function () {
-        const Greeter = await ethers.getContractFactory("Greeter");
-        const greeter = await Greeter.deploy("Hello, world!");
-        await greeter.deployed();
+    describe("Common methods", function () {
+        describe("#constructor()", function () {
+            it("Should set validator address on deploy", async function () {
+                expect(await bridgeSideA.validator()).to.be.equal(validatorSideA.address);
+            });
+        });
+        describe("#setValidator()", function () {
+            it("Should set new validator", async () => {
+                await bridgeSideA.setValidator(validatorSideB.address);
+                expect(await bridgeSideA.validator()).to.be.equal(validatorSideB.address);
+            });
+        });
+    });
 
-        expect(await greeter.greet()).to.equal("Hello, world!");
+    describe("Bridge methods", function () {
+        describe("#swap()", function () {
+            it("Should revert when user dont have enought funds", async function () {
+                const swapAmount = MINT_AMOUNT.add(parseUnits("1100"));
+                await expect(bridgeSideA.swap(ZERO_ADDRESS, swapAmount)).to.be.revertedWith(
+                    "ERC20: burn amount exceeds balance"
+                );
+            });
+            it("Should process swap to sender address when destination address not provided", async function () {
+                const swapAmount = MINT_AMOUNT;
+                const swapId = await bridgeSideA.swapId();
 
-        const setGreetingTx = await greeter.setGreeting("Hola, mundo!");
+                //Event emited
+                await expect(bridgeSideA.swap(ZERO_ADDRESS, swapAmount))
+                    .to.emit(bridgeSideA, "SwapInitialized")
+                    .withArgs(user.address, user.address, MINT_AMOUNT, swapId);
+                //Tokens burned from sender address
+                expect(await bridgeSideA.balanceOf(user.address)).to.be.equal(0);
+                //SwapId incremented
+                expect(await bridgeSideA.swapId()).to.be.equal(swapId.add(1));
+            });
+        });
+        describe("#redeem()", function () {
+            it("Should fail if swapId already used for withdraw", async () => {
+                const swapAmount = parseUnits("420");
+                const swapId = await bridgeSideA.swapId();
+                await bridgeSideA.swap(user2.address, swapAmount);
 
-        // wait until the transaction is mined
-        await setGreetingTx.wait();
+                const msg = utils.solidityKeccak256(
+                    ["address", "uint256", "uint256"],
+                    [user2.address, swapAmount, swapId]
+                );
+                const signature = await validatorSideB.signMessage(arrayify(msg));
 
-        expect(await greeter.greet()).to.equal("Hola, mundo!");
+                await bridgeSideB.redeem(user2.address, swapAmount, swapId, signature);
+
+                // Reverted because of double spend
+                await expect(bridgeSideB.redeem(user2.address, swapAmount, swapId, signature)).to.be.revertedWith(
+                    "Already redeemed"
+                );
+            });
+            it("Should fail if signature not valid", async () => {
+                const swapAmount = parseUnits("420");
+                const swapId = await bridgeSideA.swapId();
+                await bridgeSideA.swap(user2.address, swapAmount);
+
+                const msg = utils.solidityKeccak256(
+                    ["address", "uint256", "uint256"],
+                    [user2.address, swapAmount, swapId]
+                );
+                const signature = await imposter.signMessage(arrayify(msg));
+
+                // Reverted because of wrong signature
+                await expect(bridgeSideB.redeem(user2.address, swapAmount, swapId, signature)).to.be.revertedWith(
+                    "Signature not valid"
+                );
+            });
+            it("Should process redeem successfully", async () => {
+                const swapAmount = parseUnits("420");
+                const swapId = await bridgeSideA.swapId();
+                await bridgeSideA.swap(user2.address, swapAmount);
+
+                const msg = utils.solidityKeccak256(
+                    ["address", "uint256", "uint256"],
+                    [user2.address, swapAmount, swapId]
+                );
+                const signature = await validatorSideB.signMessage(arrayify(msg));
+
+                //Redeemed successfully
+                await expect(bridgeSideB.redeem(user2.address, swapAmount, swapId, signature))
+                    .to.emit(bridgeSideB, "Redeem")
+                    .withArgs(user2.address, swapAmount, swapId);
+                //Tokens minted to recipient
+                expect(await bridgeSideB.balanceOf(user2.address)).to.be.equal(swapAmount);
+                //SwapId marked as used
+                assert(await bridgeSideB.redeemedSwaps(swapId), `Swap id ${swapId} not marked as redeemed`);
+            });
+        });
     });
 });

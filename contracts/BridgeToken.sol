@@ -13,13 +13,14 @@ contract BridgeToken is ERC20, ERC20Burnable, Ownable {
     using Counters for Counters.Counter;
 
     event SwapInitialized(address from, address to, uint256 amount, uint256 nonce);
+    event Redeem(address to, uint256 amount, uint256 nonce);
 
     /// @dev Address of validator. Must be different for different sides of bridge to prevent double redeem.
     address public validator;
     /// @dev Swap id
-    Counters.Counter public nonce;
-    /// @dev Swap id that already used (withdrawed)
-    mapping (uint => bool) public withdrawals;
+    Counters.Counter public swapId;
+    /// @dev Swap id that already used (redeemed)
+    mapping(uint256 => bool) public redeemedSwaps;
 
     constructor(
         string memory name,
@@ -33,33 +34,34 @@ contract BridgeToken is ERC20, ERC20Burnable, Ownable {
         validator = validator_;
     }
 
-    function mint(address to, uint256 amount) public {
+    function mint(address to, uint256 amount) public onlyOwner {
         _mint(to, amount);
     }
 
     /// @dev request swap tokens to other evm network
     function swap(address destinationAddress, uint256 value) external {
-        require(balanceOf(msg.sender) >= value, "Not anought balance");
+        _burn(msg.sender, value);
         if (destinationAddress == address(0)) {
             destinationAddress = msg.sender;
         }
-        _burn(msg.sender, value);
-        emit SwapInitialized(msg.sender, destinationAddress, value, nonce.current());
-        nonce.increment();
+        emit SwapInitialized(msg.sender, destinationAddress, value, swapId.current());
+        swapId.increment();
     }
 
-    /// @dev redeem tokens that was swapped on other side   
+    /// @dev redeem tokens that was swapped on other side
     function redeem(
         address destinationAddress,
         uint256 value,
-        uint256 swapNonce,
+        uint256 swapId_,
         bytes memory signature
     ) external {
-        bytes32 messageHash = keccak256(abi.encodePacked(destinationAddress, value, swapNonce))
+        bytes32 messageHash = keccak256(abi.encodePacked(destinationAddress, value, swapId_))
             .toEthSignedMessageHash();
-        require(!withdrawals[swapNonce], "Already redeemed");
-        require(isValidSignature(messageHash, signature), "Signature non valid");
+        require(!redeemedSwaps[swapId_], "Already redeemed");
+        require(isValidSignature(messageHash, signature), "Signature not valid");
+        redeemedSwaps[swapId_] = true;
         _mint(destinationAddress, value);
+        emit Redeem(destinationAddress, value, swapId_);
     }
 
     /// @dev Check signature for message

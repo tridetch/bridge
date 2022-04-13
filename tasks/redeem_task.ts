@@ -7,7 +7,7 @@ const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 const rinkebyContractInfo = require("./DeployedContractsRinkeby.json");
 const ropstenContractInfo = require("./DeployedContractsRopsten.json");
 
-task("redeem", "Redeem swapped tokens.")
+task("bridgeRedeem", "Redeem swapped tokens.")
     .addOptionalParam("destinationAddress", "Amount of tokens to be swapped")
     .addParam("amount", "Amount of tokens to be redeemed")
     .addParam("swapId", "Id of swap receipt")

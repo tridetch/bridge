@@ -9,8 +9,8 @@ const rinkebyContractInfo = require("./DeployedContractsRinkeby.json");
 const ropstenContractInfo = require("./DeployedContractsRopsten.json");
 
 task(
-  "swap",
-  "Proces swap tokens to other evm network"
+  "bridgeSwap",
+  "Process swap tokens to other evm network"
   )
   .addParam("amount", "Amount of tokens to be swapped")
   .addOptionalParam("destinationAddress", "Amount of tokens to be swapped", ZERO_ADDRESS)

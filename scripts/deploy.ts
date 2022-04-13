@@ -1,30 +1,38 @@
-// We require the Hardhat Runtime Environment explicitly here. This is optional
-// but useful for running the script in a standalone fashion through `node <script>`.
-//
-// When running the script with `npx hardhat run <script>` you'll find the Hardhat
-// Runtime Environment's members available in the global scope.
+import { parseUnits } from "ethers/lib/utils";
 import { ethers } from "hardhat";
+import * as fs from "fs";
 
 async function main() {
-  // Hardhat always runs the compile task when running scripts with its command
-  // line interface.
-  //
-  // If this script is run directly using `node` you may want to call compile
-  // manually to make sure everything is compiled
-  // await hre.run('compile');
+    const currentNetwork = await ethers.provider.getNetwork();
+    const [user, validatorFromRinkeby, validatorFromRopsten] = await ethers.getSigners();
 
-  // We get the contract to deploy
-  const Greeter = await ethers.getContractFactory("Greeter");
-  const greeter = await Greeter.deploy("Hello, Hardhat!");
+    const BridgeFactory = await ethers.getContractFactory("BridgeToken");
 
-  await greeter.deployed();
+    // get validator for current network
+    const validator = currentNetwork.name === "rinkeby" ? validatorFromRopsten : validatorFromRinkeby;
 
-  console.log("Greeter deployed to:", greeter.address);
+    const bridge = await BridgeFactory.deploy("BridgeToken", "BST", validator.address);
+    await bridge.deployed();
+
+    // Mint initial funds to deployer
+    await bridge.mint(user.address, parseUnits("1000"));
+
+    const contracts = {
+        bridgeTokenAddress: bridge.address,
+        deployer: user.address,
+    };
+
+    const filePath =
+        currentNetwork.name === "rinkeby"
+            ? "./tasks/DeployedContractsRinkeby.json"
+            : "./tasks/DeployedContractsRopsten.json";
+
+    fs.writeFile(filePath, JSON.stringify(contracts), (err) => {
+        if (err) throw err;
+    });
 }
 
-// We recommend this pattern to be able to use async/await everywhere
-// and properly handle errors.
 main().catch((error) => {
-  console.error(error);
-  process.exitCode = 1;
+    console.error(error);
+    process.exitCode = 1;
 });

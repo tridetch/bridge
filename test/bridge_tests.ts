@@ -13,22 +13,22 @@ describe("Bridge", function () {
 
     let user: SignerWithAddress,
         user2: SignerWithAddress,
-        validatorSideA: SignerWithAddress,
-        validatorSideB: SignerWithAddress,
+        validatorFromAtoB: SignerWithAddress,
+        validatorFromBtoA: SignerWithAddress,
         imposter: SignerWithAddress;
 
     const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
     const MINT_AMOUNT = parseUnits("1000");
 
     before(async () => {
-        [user, user2, validatorSideA, validatorSideB, imposter] = await ethers.getSigners();
+        [user, user2, validatorFromBtoA, validatorFromAtoB, imposter] = await ethers.getSigners();
 
         const BridgeFactory = await ethers.getContractFactory("BridgeToken");
 
-        bridgeSideA = await BridgeFactory.deploy("BridgeTokenSideA", "aBST", validatorSideA.address);
+        bridgeSideA = await BridgeFactory.deploy("BridgeTokenSideA", "aBST", validatorFromBtoA.address);
         await bridgeSideA.deployed();
 
-        bridgeSideB = await BridgeFactory.deploy("BridgeTokenSideB", "bBST", validatorSideB.address);
+        bridgeSideB = await BridgeFactory.deploy("BridgeTokenSideB", "bBST", validatorFromAtoB.address);
         await bridgeSideB.deployed();
 
         // Mint initial funds for user
@@ -45,13 +45,13 @@ describe("Bridge", function () {
     describe("Common methods", function () {
         describe("#constructor()", function () {
             it("Should set validator address on deploy", async function () {
-                expect(await bridgeSideA.validator()).to.be.equal(validatorSideA.address);
+                expect(await bridgeSideA.validator()).to.be.equal(validatorFromBtoA.address);
             });
         });
         describe("#setValidator()", function () {
             it("Should set new validator", async () => {
-                await bridgeSideA.setValidator(validatorSideB.address);
-                expect(await bridgeSideA.validator()).to.be.equal(validatorSideB.address);
+                await bridgeSideA.setValidator(validatorFromAtoB.address);
+                expect(await bridgeSideA.validator()).to.be.equal(validatorFromAtoB.address);
             });
         });
     });
@@ -88,7 +88,7 @@ describe("Bridge", function () {
                     ["address", "uint256", "uint256"],
                     [user2.address, swapAmount, swapId]
                 );
-                const signature = await validatorSideB.signMessage(arrayify(msg));
+                const signature = await validatorFromAtoB.signMessage(arrayify(msg));
 
                 await bridgeSideB.redeem(user2.address, swapAmount, swapId, signature);
 
@@ -122,7 +122,7 @@ describe("Bridge", function () {
                     ["address", "uint256", "uint256"],
                     [user2.address, swapAmount, swapId]
                 );
-                const signature = await validatorSideB.signMessage(arrayify(msg));
+                const signature = await validatorFromAtoB.signMessage(arrayify(msg));
 
                 //Redeemed successfully
                 await expect(bridgeSideB.redeem(user2.address, swapAmount, swapId, signature))

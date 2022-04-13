@@ -1,0 +1,8 @@
+{
+  "destinationNetwork": "ropsten",
+  "amount": "1000000000000000000",
+  "swapId": "11",
+  "destinationAddress": "0xd5d7a8d80c426AAE43E0AA3f99E6a7E2A862D678",
+  "validator": "",
+  "signature": "0x46558f531f41fe71897a3411bcec1010e9c3194a35926fecc1bfa00fca64c1d44734799e95d5ad59623f4dc44d5fd185dbd6b76125489c942174cf8989567e6d1b"
+}

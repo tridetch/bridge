@@ -17,8 +17,9 @@ async function main() {
     // Mint initial funds to deployer
     await bridge.mint(user.address, parseUnits("1000"));
 
-    const contracts = {
+    const contract = {
         bridgeTokenAddress: bridge.address,
+        validatorAddress: validator.address,
         deployer: user.address,
     };
 
@@ -27,9 +28,12 @@ async function main() {
             ? "./tasks/DeployedContractsRinkeby.json"
             : "./tasks/DeployedContractsRopsten.json";
 
-    fs.writeFile(filePath, JSON.stringify(contracts), (err) => {
+    fs.writeFile(filePath, JSON.stringify(contract), (err) => {
+        console.log(err);
         if (err) throw err;
     });
+
+    console.log("Contract deployed", contract);
 }
 
 main().catch((error) => {

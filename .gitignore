@@ -3,6 +3,7 @@ node_modules
 coverage
 coverage.json
 typechain
+# tasks/swap_receipts
 
 #Hardhat files
 cache

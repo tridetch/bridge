@@ -35,8 +35,9 @@ task("bridgeSwap", "Process swap tokens to other evm network")
         );
 
         const signature = await validator.signMessage(utils.arrayify(msg));
+        const destinationNetwork = currentNetwork.name === "rinkeby" ? "ropsten" : "rinkeby";
         const swapReceipt = {
-            destinationNetwork: currentNetwork.name === "rinkeby" ? "ropsten" : "rinkeby",
+            destinationNetwork: destinationNetwork,
             amount: taskArgs.amount,
             swapId: swapId.toString(),
             destinationAddress: taskArgs.destinationAddress === ZERO_ADDRESS ? user.address : destinationAddress,
@@ -47,5 +48,5 @@ task("bridgeSwap", "Process swap tokens to other evm network")
         console.log("Swap receipt saved to ./tasks/swap_receipts folder");
         console.log(swapReceipt);
 
-        fs.writeFileSync(`./tasks/swap_receipts/swap_${swapId}.json`, JSON.stringify(swapReceipt));
+        fs.writeFileSync(`./tasks/swap_receipts/swap_to_${destinationAddress}_${swapId}.json`, JSON.stringify(swapReceipt));
     });

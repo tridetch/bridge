@@ -2,13 +2,12 @@
 pragma solidity ^0.8.4;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
 
 /// @title ERC-20 token that implement crosschain bridge feature.
-contract BridgeToken is ERC20, ERC20Burnable, Ownable {
+contract BridgeToken is ERC20, Ownable {
     using ECDSA for bytes32;
     using Counters for Counters.Counter;
 
